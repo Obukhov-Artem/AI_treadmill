@@ -29,7 +29,7 @@ class TreadmillControl(QMainWindow):
         self.setWindowTitle('Treadmill')
         self.current_speed = 0
         self.treadmill_length = 70
-        self.max_speed = 255
+        self.max_speed = 0
         self.human_pos = None
         self.angle = 0
 
@@ -77,7 +77,7 @@ class TreadmillControl(QMainWindow):
         #   -- Max Speed bar
         self.MaxSpeedSlider.valueChanged.connect(self.speed_changed_slider)
         self.MaxSpeedBox.valueChanged.connect(self.speed_changed_box)
-        self.MaxSpeedSlider.setValue(255)
+        self.MaxSpeedSlider.setValue(0)
         self.SpeedLock.clicked.connect(self.speed_lock)
         #   -- Length Bar
         self.LengthSlider.valueChanged.connect(self.length_changed_slider)
@@ -98,6 +98,7 @@ class TreadmillControl(QMainWindow):
 
     def angle_1(self):
         self.angle = 1
+        # print(f"COMMAND1   {self.current_speed}, {self.angle}.")
         print("COMMAND1   " + str(int(self.current_speed)) + ',  ' + str(int(self.angle)) + '.')
 
     def angle_2(self):
@@ -204,7 +205,8 @@ class TreadmillControl(QMainWindow):
 
         self.console_output("Калибровка " + pos_str, color="#000000")
         self.ard_trackers = self.human_pos
-        self.Ard_trackers.setText(self.ard_trackers[0])
+        if self.ard_trackers:
+            self.Ard_trackers.setText(self.ard_trackers[0])
         # except Exception as e:
         #   self.console_output("VR не подключен ", color="#ff0000")
 
@@ -455,6 +457,7 @@ class TreadmillControl(QMainWindow):
             print("EXTREME", e, e.__class__)
             print(self.arduino, self.ArdWhile)
         self.console_output("Платформа остановлена", color="#f89000")
+        self.MaxSpeedSlider.setValue(0)
 
     def NormalStop(self):  # problem
         try:
@@ -469,14 +472,15 @@ class TreadmillControl(QMainWindow):
                 time.sleep(0.05)
                 while self.current_speed > 0:
                     if self.arduino:
-                        self.current_speed -= 3
-                        time.sleep(0.05)
+                        self.current_speed -= 1
+                        time.sleep(0.02)
                         self.arduino.write(bytes(str(int(self.current_speed)) + ',' + str(int(0)) + '.', 'utf-8'))
                         self.conn.sendto(
                             bytes(str(int(self.current_speed * self.speed_unity_k)).rjust(4, " "), 'utf-8'),
                             (UDP_IP, UDP_PORT_Unity))
                         m = self.arduino.readline().decode()
                         print(m)
+                        print(self.current_speed)
                         if "Speed=" in m:
                             status1, status2 = m.split(",")
 
@@ -495,8 +499,8 @@ class TreadmillControl(QMainWindow):
                 time.sleep(0.05)
                 while self.current_speed < 0:
                     if self.arduino:
-                        self.current_speed += 3
-                        time.sleep(0.05)
+                        self.current_speed += 1
+                        time.sleep(0.02)
                         # print("extreme", self.current_speed)
                         self.arduino.write(bytes(str(int(self.current_speed)) + ',' + str(int(0)) + '.', 'utf-8'))
                         self.conn.sendto(
@@ -504,6 +508,7 @@ class TreadmillControl(QMainWindow):
                             (UDP_IP, UDP_PORT_Unity))
                         m = self.arduino.readline().decode()
                         print(m)
+                        print(self.current_speed)
                         if "Speed=" in m:
                             status1, status2 = m.split(",")
 
@@ -516,7 +521,7 @@ class TreadmillControl(QMainWindow):
                         break
 
             self.last_speed = 0
-            # self.arduino.write(bytes(str(int(0)) + '.', 'utf-8'))
+            self.arduino.write(bytes(str(int(0)) + '.', 'utf-8'))
             self.current_speed = 0
 
             self.MainWhile = True
@@ -525,6 +530,7 @@ class TreadmillControl(QMainWindow):
             print("NORMAL", e, e.__class__)
             print(self.arduino, self.ArdWhile)
         self.console_output("Платформа остановлена", color="#f89000")
+        self.MaxSpeedSlider.setValue(0)
 
     def update_ip(self):
         global UDP_IP
@@ -714,8 +720,8 @@ class TreadmillControl(QMainWindow):
 
     def stop(self):
         if self.arduino:
-            self.ExtremeStop()
-        if self.record_flag:
+            self.NormalStop()
+        if self.record_flag and self.data_coord:
             print("WRITING")
             name = "data" + datetime.strftime(datetime.now(), "%B %d %H %M %S")
             self.csv_writer(f'{name}.csv', self.data_coord)

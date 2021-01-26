@@ -4,7 +4,8 @@ import numpy as np
 # анализ алгоритмов управления, один из основных скриптов для анализа данных
 # открытие файла с траекторией движения на дорожке
 #data = pandas.read_csv("data\Arch\dataOctober 30 12 53 16.csv", sep=";")
-data = pandas.read_csv("two side.csv", sep=";")
+#data = pandas.read_csv("two side.csv", sep=";")
+data = pandas.read_csv("Arhipov January 26 13 37 43.csv", sep=";")
 
 moving = False
 
@@ -97,8 +98,34 @@ def alg_lin_2(z):
         else:
             return 0
 
+def alg_3(z, speed):
+    ms = speed + z * 255*0.05
+    if ms > 255:
+        return 255
 
-from keras.models import load_model
+    if ms < -255:
+        return -255
+
+    return ms
+
+def alg_4(z, speed):# not working
+    flag= True
+    if z < 0:
+        zn = -1
+    else:
+        zn = 1
+    if z >= 0:
+        return (speed+2)
+    elif 0 > z >- 0.4:
+        if speed<0 and -0.2>z>-0.4:
+            speed = speed +1
+        return speed
+    else:
+        flag = True
+        return speed -1
+
+
+#from keras.models import load_model
 
 # использование нейронной сети для управления
 def nn(z, speed, model):
@@ -145,7 +172,7 @@ def get_data(data,new_body, new_foot_1,new_foot_2, speed):
     return data
 
 # загрузка модели и данных
-NN = load_model("qmodel_400.h5")
+# NN = load_model("qmodel_400.h5")
 data = data.values
 nn_data = []
 k = (0.005 / 50)
@@ -161,8 +188,8 @@ nn_data = np.array(nn_data)
 print(data.shape)
 body_z = data[:, 2]
 body_dz = data[:, 8]
-speed_treadmill = data[:, 27] * 0.005
-delta_speed = data[:, 27] * (0.005 / 50)
+speed_treadmill = data[:, -2] * 0.005
+delta_speed = data[:, -2] * (0.005 / 50)
 foot_z_1 = data[:, 11]
 foot_z_2 = data[:, 20]
 foot_dz_1 = (data[:, 17])
@@ -171,13 +198,15 @@ foot_dz_all = (data[:, 17] + data[:, 26])
 tr_z_body = [body_z[0]]
 alg_1_z_body = [body_z[0]]
 nn_body = [body_z[0]]
-
+body_speed = [0]
+#
 tr_foot_1 = [foot_z_1[0]]
 tr_foot_2 = [foot_z_2[0]]
 nn_foot_1 = [foot_z_1[0]]
 nn_foot_2 = [foot_z_2[0]]
 
 alg_1_speed_treadmill = [0]
+alg_3_speed_treadmill = [0]
 
 nn_speed_treadmill = [0]
 
@@ -186,7 +215,7 @@ foot_dz_all2 = [0]
 new_speed = []
 h = 20
 my_speed = 0
-NUM =4000
+NUM =40000
 for i in range(1, min(len(body_z),NUM)):
     # извлечение траектории человека - с помощью вычитания текущей скорости дорожки (но т.к. она противоположна по знаку, то идет с +)
     tr_z_body.append(tr_z_body[i - 1] + body_dz[i] + delta_speed[i])
@@ -194,33 +223,36 @@ for i in range(1, min(len(body_z),NUM)):
     tr_foot_2.append(tr_foot_2[i - 1] + foot_dz_2[i] + delta_speed[i])
 
     # проверка алгоритма
-    speed = alg_lin_1(alg_1_z_body[i - 1])
+    #speed = alg_lin_2(alg_1_z_body[i - 1])
+    speed = alg_4(alg_1_z_body[i - 1], alg_3_speed_treadmill[i-1]/0.005)
+    body_speed.append((body_dz[i] + delta_speed[i]) * 50)
 
-    alg_1_speed_treadmill.append(speed * 0.005)
+    alg_3_speed_treadmill.append(speed * 0.005)
     alg_1_z_body.append(alg_1_z_body[i - 1] + body_dz[i] + delta_speed[i] - speed * (0.005 / 50))
+    #print(alg_3_speed_treadmill[-1], alg_1_z_body[-1])
 
 
-    #z = get_data(nn_data[i-1],nn_body[i-1],nn_foot_1[-1],nn_foot_2[-1], my_speed)
+    # z = get_data(nn_data[i-1],nn_body[i-1],nn_foot_1[-1],nn_foot_2[-1], my_speed)
 
     # speed, z, z_f1,z_f2, dz, dz_f1,dz_f2 = 7
     # my_speed = nn(np.array([my_speed,nn_body[i - 1],nn_foot_1[i - 1],nn_foot_2[i - 1],
     #                        body_dz[i], foot_dz_1[i], foot_dz_2[i]]), my_speed, NN)
-    # #my_speed = nn(z, my_speed, NN)
-    my_speed = nn2(nn_body[i - 1], body_dz[i], nn_foot_1[i - 1], foot_dz_1[i], nn_foot_2[i - 1], foot_dz_2[i], my_speed, NN)
+    #my_speed = nn(z, my_speed, NN)
+    # my_speed = nn2(nn_body[i - 1], body_dz[i], nn_foot_1[i - 1], foot_dz_1[i], nn_foot_2[i - 1], foot_dz_2[i], my_speed, NN)
 
-    nn_speed_treadmill.append(my_speed)
-    new_body = nn_body[i - 1] + body_dz[i] + delta_speed[i] - my_speed/50
-    new_foot_1 = nn_foot_1[i - 1] + foot_dz_1[i] + delta_speed[i] - my_speed/50
-    new_foot_2 = nn_foot_2[i - 1] + foot_dz_2[i] + delta_speed[i] - my_speed/50
+    # nn_speed_treadmill.append(my_speed)
+    # new_body = nn_body[i - 1] + body_dz[i] + delta_speed[i] - my_speed/50
+    # new_foot_1 = nn_foot_1[i - 1] + foot_dz_1[i] + delta_speed[i] - my_speed/50
+    # new_foot_2 = nn_foot_2[i - 1] + foot_dz_2[i] + delta_speed[i] - my_speed/50
 
-    nn_body.append(new_body)
-    nn_foot_1.append(new_foot_1)
-    nn_foot_2.append(new_foot_2)
+    # nn_body.append(new_body)
+    # nn_foot_1.append(new_foot_1)
+    # nn_foot_2.append(new_foot_2)
 
-    # m_foot = max([(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
-    # m_foot2 = max([abs(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [abs(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
-    # foot_dz_all.append(m_foot)
-    # foot_dz_all2.append(m_foot2)
+    m_foot = max([(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
+    m_foot2 = max([abs(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [abs(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
+    foot_dz_all.append(m_foot)
+    foot_dz_all2.append(m_foot2)
 foot_dz_all = np.array(foot_dz_all)
 print(foot_dz_all[:5])
 graph = True
@@ -231,9 +263,12 @@ if graph:
 
     fig, ax = plt.subplots(1,2)
     ax[0].plot(x, alg_1_z_body, color='orange', label="alg_1_z_body")
-    ax[0].plot(x, nn_body, color='red', label="nn_z_body")
-    ax[1].plot(x, alg_1_speed_treadmill, color='green', label="alg_1_speed_treadmill")
-    ax[1].plot(x, nn_speed_treadmill, color='blue', label="nn_speed_treadmill")
+    # ax[0].plot(x, tr_z_body, color='red', label="nn_z_body")
+    ax[0].plot(x, body_z, color='red', label="body_z")
+    #ax[1].plot(x, alg_3_speed_treadmill, color='orange', label="alg_1_speed_treadmill")
+    ax[1].plot(x, speed_treadmill, color='red', label="speed_treadmill")
+    #ax[1].plot(x, body_speed, color='green', label="speed_body")
+    # ax[1].plot(x, nn_speed_treadmill, color='blue', label="nn_speed_treadmill")
     ax[0].set_ylabel('Z')
     ax[1].set_ylabel('speed treadmill')
 
