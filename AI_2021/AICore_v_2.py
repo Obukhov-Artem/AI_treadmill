@@ -9,6 +9,8 @@ import serial
 import time, csv
 import sys
 import socket
+import random
+import math
 
 MAX_DELTA = 1500
 
@@ -380,6 +382,35 @@ class TreadmillControl(QMainWindow):
             print("error")
             return 0
 
+    def auto_speed(self):
+        current_time = time.time()
+        d_time = current_time - self.speed_time
+        print("d_time", d_time)
+        if d_time < 3:
+            speed = d_time * 0.333333 * self.random_speed
+            self.action = 1
+        elif 3 <= d_time <= 9:
+            speed = math.sin((d_time - 3) * math.pi * 0.5) * 20 + self.random_speed
+            self.const_speed = speed
+            self.action = 2
+        elif 9 < d_time <= 12:
+            speed = (3 - (d_time - 9)) * 0.3333333 * self.const_speed
+            self.action = 3
+        elif 12 < d_time <= 14:
+            speed = 0
+            self.action = 0
+        elif 14 < d_time:
+            self.speed_time = current_time
+            self.random_speed = random.randint(110, 160)
+            speed = 0
+            self.action = 0
+        speed = max(speed, 0)
+        speed = min(speed, 255)
+        return -speed
+
+            #speed = 2/d_time * random.randint(80, 150)
+
+
     def get_arduino_speed(self):
         answer = self.arduino.readline().decode()
         return answer
@@ -581,8 +612,10 @@ class TreadmillControl(QMainWindow):
         angle_message = 0
         start_time = time.time()
         start_time2 = time.time()
+        self.speed_time = time.time()
         self.data_coord = []
         self.data_pref = {}
+        self.random_speed = random.randint(110, 160)
         z = 0
         self.current_speed = 0
         try:
@@ -612,9 +645,9 @@ class TreadmillControl(QMainWindow):
 
                         else:
                             z = z - self.human_0[2]
-                            self.current_speed = self.get_speed_manual(z)
-                            if self.action:
-                                self.current_speed = 0
+                            self.current_speed = self.auto_speed()
+                            # if self.action:
+                            #     self.current_speed = 0
                             if self.record_flag:
                                 if time.time() > start_time + 1 / 50:
                                     self.data_coord.append(self.get_all_position(v))
@@ -687,10 +720,10 @@ class TreadmillControl(QMainWindow):
 
     ##################
     def type_of_action(self):
-        if self.ActionFlag.isChecked():
-            self.action = 1
-        else:
-            self.action = 0
+        # if self.ActionFlag.isChecked():
+        #     self.action = 100
+        # else:
+        #     self.action = 0
         print(self.action)
 
     ###############
