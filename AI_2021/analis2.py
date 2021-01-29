@@ -5,7 +5,8 @@ import numpy as np
 # открытие файла с траекторией движения на дорожке
 #data = pandas.read_csv("data\Arch\dataOctober 30 12 53 16.csv", sep=";")
 #data = pandas.read_csv("two side.csv", sep=";")
-data = pandas.read_csv("dataJanuary 28 15 16 46.csv", sep=";")
+data = pandas.read_csv("Teselkin dataJanuary 29 11 22 51.csv", sep=";")
+#data = pandas.read_csv("Arkhipov dataJanuary 29 11 02 36.csv", sep=";")
 
 moving = False
 
@@ -198,20 +199,20 @@ body_dz = data[:, 8]
 speed_treadmill = data[:, -2] * 0.005
 delta_speed = data[:, -2] * (0.005 / 50)
 actions = data[:, -1]
-# foot_z_1 = data[:, 11]
-# foot_z_2 = data[:, 20]
-# foot_dz_1 = (data[:, 17])
-# foot_dz_2 = (data[:, 26])
-# foot_dz_all = (data[:, 17] + data[:, 26])
+foot_z_1 = data[:, 11]
+foot_z_2 = data[:, 20]
+foot_dz_1 = (data[:, 17])
+foot_dz_2 = (data[:, 26])
+foot_dz_all = (data[:, 17] + data[:, 26])
 tr_z_body = [body_z[0]]
 alg_1_z_body = [body_z[0]]
 nn_body = [body_z[0]]
 body_speed = [0]
 #
-# tr_foot_1 = [foot_z_1[0]]
-# tr_foot_2 = [foot_z_2[0]]
-# nn_foot_1 = [foot_z_1[0]]
-# nn_foot_2 = [foot_z_2[0]]
+tr_foot_1 = [foot_z_1[0]]
+tr_foot_2 = [foot_z_2[0]]
+nn_foot_1 = [foot_z_1[0]]
+nn_foot_2 = [foot_z_2[0]]
 
 alg_1_speed_treadmill = [0]
 alg_3_speed_treadmill = [0]
@@ -220,15 +221,21 @@ nn_speed_treadmill = [0]
 
 foot_dz_all = [0]
 foot_dz_all2 = [0]
+delta_m_foot = []
 new_speed = []
 h = 20
 my_speed = 0
 NUM =40000
+
+h_stop = 5
+stop = 0
+m_stop = [0] * h_stop
+m_avg = [0] * h_stop
 for i in range(1, min(len(body_z),NUM)):
     # извлечение траектории человека - с помощью вычитания текущей скорости дорожки (но т.к. она противоположна по знаку, то идет с +)
     tr_z_body.append(tr_z_body[i - 1] + body_dz[i] + delta_speed[i])
-    # tr_foot_1.append(tr_foot_1[i - 1] + foot_dz_1[i] + delta_speed[i])
-    # tr_foot_2.append(tr_foot_2[i - 1] + foot_dz_2[i] + delta_speed[i])
+    tr_foot_1.append(tr_foot_1[i - 1] + foot_dz_1[i] + delta_speed[i])
+    tr_foot_2.append(tr_foot_2[i - 1] + foot_dz_2[i] + delta_speed[i])
 
     # проверка алгоритма
     speed = alg_lin_1(alg_1_z_body[i - 1])
@@ -258,13 +265,30 @@ for i in range(1, min(len(body_z),NUM)):
     # nn_foot_1.append(new_foot_1)
     # nn_foot_2.append(new_foot_2)
 
-#     m_foot = max([(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
-#     m_foot2 = max([abs(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [abs(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
-#     foot_dz_all.append(m_foot)
-#     foot_dz_all2.append(m_foot2)
-# foot_dz_all = np.array(foot_dz_all)
+    # m_foot = max([(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
+    # m_foot2 = max([abs(j) for j in foot_dz_1[i:max(i - h, 0):-1]] + [abs(j) for j in foot_dz_2[i:max(i - h, 0):-1]])
+    m_foot = abs(foot_dz_2[i] - foot_dz_1[i])
+    if i >= h_stop:
+       a = abs(sum(foot_dz_all[i - h_stop : i]) / h_stop - m_avg[-2])
+       m_avg.append(sum(foot_dz_all[i - h_stop : i]) / h_stop)
+       if a > 0.001:
+           stop = 0
+       else:
+           stop+=1
+       if stop>8:
+           m_stop.append(0)
+       else:
+           m_stop.append(1)
+       print(sum(foot_dz_all[i - h_stop : i]) / h_stop, m_avg[-2], a, m_stop[-1])
+
+    foot_dz_all.append(m_foot)
+
+
+
+    # foot_dz_all2.append(m_foot2)
+foot_dz_all = np.array(foot_dz_all)
 # print(foot_dz_all[:5])
-graph = True
+graph = False
 x = [i / 50 for i in range(min(len(body_z),NUM))]
 # plt.plot(range(len(body_z)),body_z)
 # построение графиков
@@ -308,6 +332,7 @@ else:
     ax1 = ax.twinx()
     ax.plot(x, foot_z_1, color='r')
     ax.plot(x, foot_z_2, color='g')
+    ax.plot(x, m_stop, color='orange')
     ax1.plot(x, speed_treadmill, color='b')
     ax1.set_ylabel('speed treadmill')
     ax.set_ylabel('Z')
@@ -324,15 +349,17 @@ else:
 
     ax.set_title("Положение ног в пространстве без учета сдвига дорожки")
     plt.show()
+
     fig, ax = plt.subplots()
     ax1 = ax.twinx()
     # ax.plot(x,foot_dz_1,color='r')
     # ax.plot(x,foot_dz_2,color='g')
-    ax.plot(x, body_z, color='r')
+    ax.plot(x, foot_z_2, color='r')
     ax.plot(x, foot_z_1, color='y')
     ax.plot(x, foot_dz_all, color='black')
+    ax.plot(x, m_stop, color='g')
     # ax.plot(x, new_speed, color='g')
-    ax1.plot(x, speed_treadmill, color='b')
+    #ax1.plot(x, speed_treadmill, color='b')
     ax.set_ylabel('Z')
     ax1.set_ylabel('speed treadmill')
     ax.set_title("Скорость ног на дорожке ")
